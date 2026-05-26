@@ -1,71 +1,34 @@
-# ====================================================
-# Install-Remote.ps1
-# Instalador remoto - PSUninstaller
-# ====================================================
+[CmdletBinding()]
+param(
+    [ValidateSet('CurrentUser','AllUsers')]
+    [string]$Scope = 'CurrentUser',
 
-$ErrorActionPreference = "Stop"
+    [string]$ReleaseUrl = 'https://github.com/jhoylsonn/PSUninstaller/releases/latest/download/PSUninstaller.zip'
+)
 
-$ReleaseUrl = "https://github.com/jhoylsonn/PSUninstaller/releases/latest/download/PSUninstaller.zip"
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 
-$tempFolder = Join-Path $env:TEMP "PSUninstaller"
-$zipPath    = Join-Path $tempFolder "PSUninstaller.zip"
+$tempRoot = Join-Path $env:TEMP ('PSUninstaller_' + [guid]::NewGuid().ToString('N'))
+$zipPath = Join-Path $tempRoot 'PSUninstaller.zip'
 
-Write-Host ""
-Write-Host "Baixando PSUninstaller de:"
-Write-Host $ReleaseUrl
-Write-Host ""
-
-if (!(Test-Path $tempFolder)) {
-    New-Item -Path $tempFolder `
-             -ItemType Directory `
-             -Force | Out-Null
-}
+New-Item -Path $tempRoot -ItemType Directory -Force | Out-Null
 
 try {
+    Write-Host "Baixando PSUninstaller de: $ReleaseUrl"
+    Invoke-WebRequest -Uri $ReleaseUrl -OutFile $zipPath -UseBasicParsing
 
-    Invoke-WebRequest `
-        -Uri $ReleaseUrl `
-        -OutFile $zipPath `
-        -UseBasicParsing
+    Expand-Archive -Path $zipPath -DestinationPath $tempRoot -Force
 
+    $installer = Get-ChildItem -Path $tempRoot -Filter 'Install-PSUninstaller.ps1' -Recurse | Select-Object -First 1
+    if (-not $installer) {
+        throw 'Install-PSUninstaller.ps1 nao encontrado no pacote baixado.'
+    }
+
+    & $installer.FullName -Scope $Scope -Force
 }
-catch {
-
-    Write-Host ""
-    Write-Warning "Falha ao baixar release."
-
-    Write-Host $_.Exception.Message
-    return
+finally {
+    if (Test-Path $tempRoot) {
+        Remove-Item -Path $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
-
-Write-Host "Download concluido."
-
-Write-Host ""
-Write-Host "Extraindo arquivos..."
-
-Expand-Archive `
-    -Path $zipPath `
-    -DestinationPath $tempFolder `
-    -Force
-
-$installScript = Get-ChildItem `
-    -Path $tempFolder `
-    -Filter "Install-PSUninstaller.ps1" `
-    -Recurse |
-    Select-Object -First 1
-
-if (!$installScript) {
-
-    Write-Warning "Install-PSUninstaller.ps1 nao encontrado."
-
-    return
-}
-
-Write-Host ""
-Write-Host "Executando instalador..."
-Write-Host ""
-
-& $installScript.FullName
-
-Write-Host ""
-Write-Host "PSUninstaller instalado com sucesso."
