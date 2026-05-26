@@ -69,4 +69,3 @@ Write-Host ""
 
 Write-Host ""
 Write-Host "PSUninstaller instalado com sucesso."
-Write-Host ""
